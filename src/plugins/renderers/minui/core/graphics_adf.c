@@ -69,6 +69,8 @@ adf_surface_init(struct adf_pdata *pdata, struct drm_mode_modeinfo *mode,
 
 	surf->base.width = mode->hdisplay;
 	surf->base.height = mode->vdisplay;
+	surf->base.mm_width = 0; /* Unimplemented */
+	surf->base.mm_height = 0; /* Unimplemented */
 	surf->base.row_bytes = surf->pitch;
 	surf->base.pixel_bytes = (pdata->format == DRM_FORMAT_RGB565) ? 2 : 4;
 

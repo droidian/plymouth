@@ -853,6 +853,7 @@ ply_set_device_scale (int device_scale)
 
 /* The minimum resolution at which we turn on a device-scale of 2 */
 #define HIDPI_LIMIT 192
+#define HIDPI_SCALE_3_LIMIT 320
 #define HIDPI_MIN_HEIGHT 1200
 
 int
@@ -867,31 +868,43 @@ ply_get_device_scale (uint32_t width,
 
         device_scale = 1;
 
-        if ((force_device_scale = getenv ("PLYMOUTH_FORCE_SCALE")))
+        if ((force_device_scale = getenv ("PLYMOUTH_FORCE_SCALE"))) {
+                ply_trace ("forced by env");
                 return strtoul (force_device_scale, NULL, 0);
+        }
 
-        if (overridden_device_scale != 0)
+        if (overridden_device_scale != 0) {
+                ply_trace ("forced by override");
                 return overridden_device_scale;
+        }
 
-        if (height < HIDPI_MIN_HEIGHT)
+        if (height < HIDPI_MIN_HEIGHT) {
+                ply_trace ("forced by < MIN_HEIGHT");
                 return 1;
+        }
 
         /* Somebody encoded the aspect ratio (16/9 or 16/10)
          * instead of the physical size */
         if ((width_mm == 160 && height_mm == 90) ||
             (width_mm == 160 && height_mm == 100) ||
             (width_mm == 16 && height_mm == 9) ||
-            (width_mm == 16 && height_mm == 10))
+            (width_mm == 16 && height_mm == 10)) {
+                ply_trace ("forced by aspect ratio as phyisical size");
                 return 1;
+        }
 
         if (width_mm > 0 && height_mm > 0) {
                 dpi_x = (double)width / (width_mm / 25.4);
                 dpi_y = (double)height / (height_mm / 25.4);
                 /* We don't completely trust these values so both
-                   must be high, and never pick higher ratio than
-                   2 automatically */
-                if (dpi_x > HIDPI_LIMIT && dpi_y > HIDPI_LIMIT)
+                   must be high */
+                ply_trace ("dpi_x %f, dpi_y %f, width_mm %d, height_mm %d", dpi_x, dpi_y, width_mm, height_mm);
+                if (dpi_x > HIDPI_SCALE_3_LIMIT && dpi_y > HIDPI_SCALE_3_LIMIT) {
+                        ply_trace ("Chosen scale 3");
+                        device_scale = 3;
+                } else if (dpi_x > HIDPI_LIMIT && dpi_y > HIDPI_LIMIT) {
                         device_scale = 2;
+                }
         }
 
         return device_scale;

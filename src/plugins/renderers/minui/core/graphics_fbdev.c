@@ -144,12 +144,14 @@ fbdev_init(minui_backend *backend, bool blank)
 	       "  vi.nonstd = %d\n"
 	       "  fi.type = %d\n"
 	       "  fi.capabilities = %d\n"
+	       "  vi.width        = %d    .height = %d\n"
 	       "  vi.red.offset   = %3d   .length = %3d\n"
 	       "  vi.green.offset = %3d   .length = %3d\n"
 	       "  vi.blue.offset  = %3d   .length = %3d\n"
 	       "  vi.alpha.offset = %3d   .length = %3d\n",
 	       vi.bits_per_pixel, vi.colorspace, vi.grayscale, vi.nonstd,
-	       fi.type, fi.capabilities, vi.red.offset, vi.red.length,
+	       fi.type, fi.capabilities, vi.width, vi.height,
+	       vi.red.offset, vi.red.length,
 	       vi.green.offset, vi.green.length, vi.blue.offset,
 	       vi.blue.length, vi.transp.offset, vi.transp.length);
 
@@ -181,6 +183,8 @@ fbdev_init(minui_backend *backend, bool blank)
 
 	gr_framebuffer[0].width = vi.xres;
 	gr_framebuffer[0].height = vi.yres;
+	gr_framebuffer[0].mm_width = vi.width;
+	gr_framebuffer[0].mm_height = vi.height;
 	gr_framebuffer[0].row_bytes = fi.line_length;
 	gr_framebuffer[0].pixel_bytes = vi.bits_per_pixel / 8;
 	gr_framebuffer[0].data = bits;

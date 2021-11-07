@@ -853,6 +853,7 @@ ply_set_device_scale (int device_scale)
 
 /* The minimum resolution at which we turn on a device-scale of 2 */
 #define HIDPI_LIMIT 192
+#define HIDPI_SCALE_3_LIMIT 320
 #define HIDPI_MIN_HEIGHT 1200
 
 int
@@ -888,9 +889,10 @@ ply_get_device_scale (uint32_t width,
                 dpi_x = (double)width / (width_mm / 25.4);
                 dpi_y = (double)height / (height_mm / 25.4);
                 /* We don't completely trust these values so both
-                   must be high, and never pick higher ratio than
-                   2 automatically */
-                if (dpi_x > HIDPI_LIMIT && dpi_y > HIDPI_LIMIT)
+                   must be high */
+                if (dpi_x > HIDPI_SCALE_3_LIMIT && dpi_y > HIDPI_SCALE_3_LIMIT)
+                        device_scale = 3;
+                else if (dpi_x > HIDPI_LIMIT && dpi_y > HIDPI_LIMIT)
                         device_scale = 2;
         }
 

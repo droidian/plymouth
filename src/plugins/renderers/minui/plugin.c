@@ -62,6 +62,7 @@ struct _ply_renderer_head
         ply_pixel_buffer_t     *pixel_buffer;
         ply_rectangle_t         area; /* in device pixels */
         gr_surface              surface;
+        int                     scale;
 };
 
 struct _ply_renderer_input_source
@@ -147,6 +148,7 @@ initialize_head (ply_renderer_backend_t *backend,
                    head->area.width, head->area.height);
         head->pixel_buffer = ply_pixel_buffer_new (head->area.width,
                                                    head->area.height);
+        ply_pixel_buffer_set_device_scale (head->pixel_buffer, head->scale);
         ply_pixel_buffer_fill_with_color (backend->head.pixel_buffer, NULL,
                                           0.0, 0.0, 0.0, 1.0);
         ply_list_append_data (backend->heads, head);
@@ -161,7 +163,10 @@ query_device (ply_renderer_backend_t *backend)
         backend->head.area.y = 0;
         backend->head.area.width = gr_fb_width();
         backend->head.area.height = gr_fb_height();
-        
+        backend->head.scale = ply_get_device_scale (backend->head.area.width,
+                                                    backend->head.area.height,
+                                                    gr_fb_mm_width (),
+                                                    gr_fb_mm_height ());
         initialize_head (backend, &backend->head);
 
         return true;

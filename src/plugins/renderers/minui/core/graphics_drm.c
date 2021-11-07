@@ -113,7 +113,8 @@ static int drm_format_to_bpp(uint32_t format) {
             return 32;
     }
 }
-static struct drm_surface *drm_create_surface(int width, int height) {
+static struct drm_surface *drm_create_surface(int width, int height,
+    int mm_width, int mm_height) {
     struct drm_surface *surface;
     struct drm_mode_create_dumb create_dumb;
     uint32_t format;
@@ -167,6 +168,8 @@ static struct drm_surface *drm_create_surface(int width, int height) {
     }
     surface->base.height = height;
     surface->base.width = width;
+    surface->base.mm_height = mm_height;
+    surface->base.mm_width = mm_width;
     surface->base.row_bytes = create_dumb.pitch;
     surface->base.pixel_bytes = create_dumb.bpp / 8;
     surface->base.data = (unsigned char*)
@@ -308,7 +311,7 @@ static GRSurface* drm_init(minui_backend* backend __unused) {
     drmModeRes *res = NULL;
     uint32_t selected_mode;
     char *dev_name;
-    int width, height;
+    int width, height, mm_width, mm_height;
     int ret, i;
     /* Consider DRM devices in order. */
     for (i = 0; i < DRM_MAX_MINOR; i++) {
@@ -364,9 +367,11 @@ static GRSurface* drm_init(minui_backend* backend __unused) {
     main_monitor_crtc->mode = main_monitor_connector->modes[selected_mode];
     width = main_monitor_crtc->mode.hdisplay;
     height = main_monitor_crtc->mode.vdisplay;
+    mm_width = main_monitor_connector->mmWidth;
+    mm_height = main_monitor_connector->mmHeight;
     drmModeFreeResources(res);
-    drm_surfaces[0] = drm_create_surface(width, height);
-    drm_surfaces[1] = drm_create_surface(width, height);
+    drm_surfaces[0] = drm_create_surface(width, height, mm_width, mm_height);
+    drm_surfaces[1] = drm_create_surface(width, height, mm_width, mm_height);
     if (!drm_surfaces[0] || !drm_surfaces[1]) {
         drm_destroy_surface(drm_surfaces[0]);
         drm_destroy_surface(drm_surfaces[1]);

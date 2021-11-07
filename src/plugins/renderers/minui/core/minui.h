@@ -30,6 +30,8 @@ typedef struct {
 	int height;
 	int row_bytes;
 	int pixel_bytes;
+	int mm_width;
+	int mm_height;
 	unsigned char *data;
 } GRSurface;
 
@@ -41,6 +43,8 @@ void gr_exit(void);
 
 int  gr_fb_width(void);
 int  gr_fb_height(void);
+int  gr_fb_mm_width(void);
+int  gr_fb_mm_height(void);
 
 void gr_flip(void);
 void gr_fb_blank(bool blank);

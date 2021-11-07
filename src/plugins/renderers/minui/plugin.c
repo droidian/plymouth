@@ -148,10 +148,14 @@ initialize_head (ply_renderer_backend_t *backend,
                    head->area.width, head->area.height);
         head->pixel_buffer = ply_pixel_buffer_new (head->area.width,
                                                    head->area.height);
+        ply_trace ("pixel_buffer created");
         ply_pixel_buffer_set_device_scale (head->pixel_buffer, head->scale);
+        ply_trace ("scale set");
         ply_pixel_buffer_fill_with_color (backend->head.pixel_buffer, NULL,
                                           0.0, 0.0, 0.0, 1.0);
+        ply_trace ("buffer filled");
         ply_list_append_data (backend->heads, head);
+        ply_trace ("data appended");
 }
 
 static bool

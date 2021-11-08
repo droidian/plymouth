@@ -7,7 +7,7 @@ ConditionKernelCommandLine=!plymouth.enable=0
 ConditionVirtualization=!container
 
 [Service]
-ExecStart=/usr/sbin/plymouthd --mode=reboot --attach-to-session
+ExecStart=/usr/sbin/plymouthd --mode=reboot --attach-to-session --kernel-command-line "splash plymouth.ignore-udev"
 ExecStartPost=-/usr/bin/plymouth show-splash
 Type=forking
 RemainAfterExit=yes

@@ -32,6 +32,6 @@ done
 if [ "${SPLASH}" = "true" ]
 then
 	mkdir -m 0755 /run/plymouth
-	/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid
+	/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --kernel-command-line "splash plymouth.ignore-udev"
 	/usr/bin/plymouth --show-splash
 fi

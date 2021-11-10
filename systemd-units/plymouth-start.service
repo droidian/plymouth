@@ -6,11 +6,12 @@ After=systemd-vconsole-setup.service systemd-udev-trigger.service systemd-udevd.
 Before=systemd-ask-password-plymouth.service
 ConditionKernelCommandLine=!plymouth.enable=0
 ConditionVirtualization=!container
+IgnoreOnIsolate=true
 
 [Service]
-ExecStart=/usr/sbin/plymouthd --mode=boot --pid-file=/var/run/plymouth/pid --attach-to-session
-ExecStartPost=-/usr/bin/plymouth show-splash
+ExecStart=/usr/local/sbin/plymouthd --mode=boot --pid-file=${prefix}/var/run/plymouth/pid --attach-to-session
+ExecStartPost=-/usr/local/bin/plymouth show-splash
 Type=forking
 RemainAfterExit=yes
-KillMode=none
+KillMode=mixed
 SendSIGKILL=no

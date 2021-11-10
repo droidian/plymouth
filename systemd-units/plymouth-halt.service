@@ -7,7 +7,7 @@ ConditionKernelCommandLine=!plymouth.enable=0
 ConditionVirtualization=!container
 
 [Service]
-ExecStart=/usr/sbin/plymouthd --mode=shutdown --attach-to-session
-ExecStartPost=-/usr/bin/plymouth show-splash
+ExecStart=/usr/local/sbin/plymouthd --mode=shutdown --attach-to-session
+ExecStartPost=-/usr/local/bin/plymouth show-splash
 Type=forking
 RemainAfterExit=yes

@@ -9,6 +9,7 @@ usr/lib/*/plymouth/script.so
 usr/lib/*/plymouth/text.so
 usr/lib/*/plymouth/tribar.so
 usr/libexec/plymouth/*-initrd
+usr/libexec/plymouth/plymouthd-fd-escrow
 usr/sbin
 usr/sbin
 usr/share/locale

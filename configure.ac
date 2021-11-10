@@ -1,4 +1,4 @@
-AC_INIT([plymouth],[0.9.5],[https://gitlab.freedesktop.org/plymouth/plymouth/issues])
+AC_INIT([plymouth],[0.9.5+git20211018],[https://gitlab.freedesktop.org/plymouth/plymouth/issues])
 AC_CONFIG_SRCDIR(src/main.c)
 AC_CONFIG_HEADER(config.h)
 AC_CONFIG_AUX_DIR(build-tools)
@@ -16,6 +16,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_MAINTAINER_MODE([enable])
 
 AM_GNU_GETTEXT_VERSION([0.19.8])
+AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.8])
 AM_GNU_GETTEXT([external])
 
 PKG_PROG_PKG_CONFIG
@@ -341,6 +342,7 @@ AC_CONFIG_FILES([Makefile po/Makefile.in
            systemd-units/plymouth-reboot.service
            systemd-units/plymouth-start.service
            systemd-units/plymouth-switch-root.service
+           systemd-units/plymouth-switch-root-initramfs.service
            systemd-units/systemd-ask-password-plymouth.path
            systemd-units/systemd-ask-password-plymouth.service
            systemd-units/Makefile

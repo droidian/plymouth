@@ -139,6 +139,7 @@ struct _ply_boot_splash_plugin
         ply_image_t                        *header_image;
         ply_image_t                        *background_tile_image;
         ply_image_t                        *background_bgrt_image;
+        ply_image_t                        *background_bgrt_fallback_image;
         ply_image_t                        *watermark_image;
         ply_list_t                         *views;
 
@@ -470,7 +471,7 @@ view_set_bgrt_background (view_t *view)
                 panel_rotation = PLY_PIXEL_BUFFER_ROTATE_UPRIGHT;
         }
 
-        if (have_panel_props) {        
+        if (have_panel_props) {
                 ply_pixel_buffer_set_device_rotation (bgrt_buffer, panel_rotation);
                 ply_pixel_buffer_set_device_scale (bgrt_buffer, panel_scale);
         }
@@ -560,6 +561,30 @@ view_set_bgrt_background (view_t *view)
         }
 }
 
+static void
+view_set_bgrt_fallback_background (view_t *view)
+{
+        int width, height, x_offset, y_offset;
+        int screen_width, screen_height, screen_scale;
+        ply_pixel_buffer_t *image_buffer;
+
+        screen_width = ply_pixel_display_get_width (view->display);
+        screen_height = ply_pixel_display_get_height (view->display);
+        screen_scale = ply_pixel_display_get_device_scale (view->display);
+
+        image_buffer = ply_image_get_buffer (view->plugin->background_bgrt_fallback_image);
+
+        width = ply_pixel_buffer_get_width (image_buffer);
+        height = ply_pixel_buffer_get_height (image_buffer);
+        x_offset = (screen_width - width) / 2;
+        y_offset = screen_height * 382 / 1000 - height / 2;
+
+        view->background_buffer = ply_pixel_buffer_new (screen_width * screen_scale, screen_height * screen_scale);
+        ply_pixel_buffer_set_device_scale (view->background_buffer, screen_scale);
+        ply_pixel_buffer_fill_with_hex_color (view->background_buffer, NULL, 0x000000);
+        ply_pixel_buffer_fill_with_buffer (view->background_buffer, image_buffer, x_offset, y_offset);
+}
+
 static bool
 view_load (view_t *view)
 {
@@ -579,6 +604,9 @@ view_load (view_t *view)
         screen_scale = ply_pixel_buffer_get_device_scale (buffer);
 
         view_set_bgrt_background (view);
+
+        if (!view->background_buffer && plugin->background_bgrt_fallback_image != NULL)
+                view_set_bgrt_fallback_background (view);
 
         if (!view->background_buffer && plugin->background_tile_image != NULL) {
                 ply_trace ("tiling background to %lux%lu", screen_width, screen_height);
@@ -905,7 +933,7 @@ view_show_prompt (view_t     *view,
 
                 view->lock_area.x =
                     view->dialog_area.x +
-                    (view->dialog_area.width - 
+                    (view->dialog_area.width -
                      (view->lock_area.width + entry_width)) / 2.0;
                 view->lock_area.y =
                     view->dialog_area.y +
@@ -1009,8 +1037,8 @@ load_mode_settings (ply_boot_splash_plugin_t *plugin,
         if (settings->use_firmware_background)
                 plugin->use_firmware_background = true;
 
-        settings->title = ply_key_file_get_value (key_file, group_name, "_Title");
-        settings->subtitle = ply_key_file_get_value (key_file, group_name, "_SubTitle");
+        settings->title = ply_key_file_get_value (key_file, group_name, "Title");
+        settings->subtitle = ply_key_file_get_value (key_file, group_name, "SubTitle");
 }
 
 static ply_boot_splash_plugin_t *
@@ -1150,8 +1178,13 @@ create_plugin (ply_key_file_t *key_file)
         load_mode_settings (plugin, key_file, "system-upgrade", PLY_BOOT_SPLASH_MODE_SYSTEM_UPGRADE);
         load_mode_settings (plugin, key_file, "firmware-upgrade", PLY_BOOT_SPLASH_MODE_FIRMWARE_UPGRADE);
 
-        if (plugin->use_firmware_background)
+        if (plugin->use_firmware_background) {
                 plugin->background_bgrt_image = ply_image_new ("/sys/firmware/acpi/bgrt/image");
+
+                asprintf (&image_path, "%s/bgrt-fallback.png", image_dir);
+                plugin->background_bgrt_fallback_image = ply_image_new (image_path);
+                free (image_path);
+        }
 
         plugin->dialog_clears_firmware_background =
                 ply_key_file_get_bool (key_file, "two-step", "DialogClearsFirmwareBackground");
@@ -1242,6 +1275,9 @@ destroy_plugin (ply_boot_splash_plugin_t *plugin)
 
         if (plugin->background_bgrt_image != NULL)
                 ply_image_free (plugin->background_bgrt_image);
+
+        if (plugin->background_bgrt_fallback_image != NULL)
+                ply_image_free (plugin->background_bgrt_fallback_image);
 
         if (plugin->watermark_image != NULL)
                 ply_image_free (plugin->watermark_image);
@@ -1394,8 +1430,11 @@ draw_background (view_t             *view,
         ply_boot_splash_plugin_t *plugin;
         ply_rectangle_t area;
         bool use_black_background = false;
+        bool using_fw_background;
 
         plugin = view->plugin;
+
+        using_fw_background = (plugin->background_bgrt_image || plugin->background_bgrt_fallback_image);
 
         area.x = x;
         area.y = y;
@@ -1405,7 +1444,7 @@ draw_background (view_t             *view,
         /* When using the firmware logo as background and we should not use
          * it for this mode, use solid black as background.
          */
-        if (plugin->background_bgrt_image &&
+        if (using_fw_background &&
             !plugin->mode_settings[plugin->mode].use_firmware_background)
                 use_black_background = true;
 
@@ -1414,7 +1453,7 @@ draw_background (view_t             *view,
          */
         if ((plugin->state == PLY_BOOT_SPLASH_DISPLAY_QUESTION_ENTRY ||
              plugin->state == PLY_BOOT_SPLASH_DISPLAY_PASSWORD_ENTRY) &&
-            plugin->background_bgrt_image && plugin->dialog_clears_firmware_background)
+            using_fw_background && plugin->dialog_clears_firmware_background)
                 use_black_background = true;
 
         if (use_black_background)
@@ -1603,8 +1642,6 @@ show_splash_screen (ply_boot_splash_plugin_t *plugin,
                     ply_buffer_t             *boot_buffer,
                     ply_boot_splash_mode_t    mode)
 {
-        int i;
-
         assert (plugin != NULL);
 
         plugin->loop = loop;
@@ -1657,9 +1694,14 @@ show_splash_screen (ply_boot_splash_plugin_t *plugin,
                 } else {
                         ply_image_free (plugin->background_bgrt_image);
                         plugin->background_bgrt_image = NULL;
-                        for (i = 0; i < PLY_BOOT_SPLASH_MODE_COUNT; i++)
-                                plugin->mode_settings[i].use_firmware_background = false;
-                        plugin->use_firmware_background = false;
+                }
+        }
+
+        if (plugin->background_bgrt_fallback_image != NULL) {
+                ply_trace ("loading background bgrt fallback image");
+                if (!ply_image_load (plugin->background_bgrt_fallback_image)) {
+                        ply_image_free (plugin->background_bgrt_fallback_image);
+                        plugin->background_bgrt_fallback_image = NULL;
                 }
         }
 

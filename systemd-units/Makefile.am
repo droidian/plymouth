@@ -1,4 +1,5 @@
 systemd_unit_templates =                                                     \
+        plymouth-determine-scale.service.in                                  \
         plymouth-switch-root.service.in                                      \
         plymouth-start.service.in                                            \
         plymouth-read-write.service.in                                       \
@@ -31,6 +32,7 @@ install-data-hook:
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/sysinit.target.wants &&            \
 		rm -f plymouth-start.service plymouth-read-write.service &&  \
 		$(LN_S) ../plymouth-start.service &&                         \
+		$(LN_S) ../plymouth-determine-scale.service &&               \
 		$(LN_S) ../plymouth-read-write.service)
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/multi-user.target.wants &&         \
 		rm -f plymouth-quit.service plymouth-quit-wait.service &&    \
@@ -53,7 +55,7 @@ uninstall-hook:
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/initrd-switch-root.target.wants && \
 		rm -f plymouth-start.service plymouth-switch-root.service)
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/sysinit.target.wants &&            \
-		rm -f plymouth-start.service plymouth-read-write.service)
+		rm -f plymouth-start.service plymouth-determine-scale.service plymouth-read-write.service)
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/multi-user.target.wants &&         \
 		rm -f plymouth-quit.service plymouth-quit-wait.service)
 	(cd $(DESTDIR)$(SYSTEMD_UNIT_DIR)/reboot.target.wants &&             \

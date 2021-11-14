@@ -15,6 +15,7 @@ case ${1} in
 esac
 
 SPLASH="true"
+PLYMOUTH_FORCE_SCALE="1" # HACK: default to 1 to ensure the Droidian logo is crisp
 
 for ARGUMENT in $(cat /proc/cmdline)
 do
@@ -26,12 +27,17 @@ do
 		nosplash*|plymouth.enable=0)
 			SPLASH="false"
 			;;
+
+		plymouth.force-scale=*)
+			PLYMOUTH_FORCE_SCALE="$(echo ${ARGUMENT} | cut -d= -f2)"
+			;;
 	esac
 done
 
 if [ "${SPLASH}" = "true" ]
 then
+	export PLYMOUTH_FORCE_SCALE
 	mkdir -m 0755 /run/plymouth
-	/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid
+	/usr/sbin/plymouthd --mode=boot --attach-to-session --pid-file=/run/plymouth/pid --kernel-command-line "splash plymouth.ignore-udev"
 	/usr/bin/plymouth --show-splash
 fi

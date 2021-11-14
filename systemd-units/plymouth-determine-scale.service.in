@@ -1,0 +1,12 @@
+[Unit]
+Description=Determine Plymouth scaling
+DefaultDependencies=no
+ConditionPathExists=!/system-update
+ConditionPathExists=!/var/cache/flash-bootimage/flash-bootimage-switch-slot
+ConditionKernelCommandLine=!plymouth.enable=0
+ConditionVirtualization=!container
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "/usr/bin/systemctl set-environment PLYMOUTH_FORCE_SCALE=1"
+RemainAfterExit=no

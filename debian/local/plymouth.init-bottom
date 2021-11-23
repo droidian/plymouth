@@ -18,7 +18,7 @@ esac
 # do a system update (which is the only place where we show labels),
 # we must switch to the correct scaling factor. This will be determined
 # during boot, so we quit here
-if [ -h "${rootmnt}/system-update" ] || [ -e "/var/cache/flash-bootimage/flash-bootimage-switch-slot" ]; then
+if [ -h "${rootmnt}/system-update" ] || [ -e "${rootmnt}/var/cache/flash-bootimage/flash-bootimage-switch-slot" ]; then
 	/usr/bin/plymouth quit
 else
 	/usr/bin/plymouth --newroot=${rootmnt}

@@ -158,6 +158,7 @@ static void on_quit (state_t       *state,
 static bool sh_is_init (state_t *state);
 static void cancel_pending_delayed_show (state_t *state);
 static void prepare_logging (state_t *state);
+static void dump_debug_buffer_to_file (void);
 
 static void
 on_session_output (state_t    *state,
@@ -261,6 +262,35 @@ show_messages (state_t *state)
 }
 
 static bool
+get_theme_path (const char  *splash_string,
+                const char  *configured_theme_dir,
+                char       **theme_path)
+{
+        const char *paths[] = { PLYMOUTH_RUNTIME_THEME_PATH,
+                                configured_theme_dir,
+                                PLYMOUTH_THEME_PATH };
+        size_t i;
+
+        for (i = 0; i < PLY_NUMBER_OF_ELEMENTS (paths); ++i) {
+                if (paths[i] == NULL)
+                        continue;
+
+                asprintf (theme_path,
+                          "%s/%s/%s.plymouth",
+                          paths[i], splash_string, splash_string);
+                if (ply_file_exists (*theme_path)) {
+                        ply_trace ("Theme is %s", *theme_path);
+                        return true;
+                }
+                ply_trace ("Theme %s not found", *theme_path);
+                free (*theme_path);
+                *theme_path = NULL;
+        }
+
+        return false;
+}
+
+static bool
 load_settings (state_t    *state,
                const char *path,
                char      **theme_path)
@@ -279,42 +309,21 @@ load_settings (state_t    *state,
         splash_string = ply_key_file_get_value (key_file, "Daemon", "Theme");
 
         if (splash_string != NULL) {
-                asprintf (theme_path,
-                          PLYMOUTH_RUNTIME_THEME_PATH "%s/%s.plymouth",
-                          splash_string, splash_string);
-                ply_trace ("Checking if %s exists", *theme_path);
-                if (!ply_file_exists (*theme_path)) {
-                        ply_trace ("%s not found, fallbacking to " PLYMOUTH_THEME_PATH,
-                                   *theme_path);
-                        asprintf (theme_path,
-                                  PLYMOUTH_THEME_PATH "%s/%s.plymouth",
-                                  splash_string, splash_string);
-                }
+                char *configured_theme_dir;
+                configured_theme_dir = ply_key_file_get_value (key_file, "Daemon",
+                                                                         "ThemeDir");
+                get_theme_path (splash_string, configured_theme_dir, theme_path);
+                free (configured_theme_dir);
         }
 
         if (isnan (state->splash_delay)) {
-                char *delay_string;
-
-                delay_string = ply_key_file_get_value (key_file, "Daemon", "ShowDelay");
-
-                if (delay_string != NULL) {
-                        state->splash_delay = atof (delay_string);
-                        ply_trace ("Splash delay is set to %lf", state->splash_delay);
-                        free (delay_string);
-                }
+                state->splash_delay = ply_key_file_get_double(key_file, "Daemon", "ShowDelay", NAN);
+                ply_trace ("Splash delay is set to %lf", state->splash_delay);
         }
 
         if (isnan (state->device_timeout)) {
-                char *timeout_string;
-
-                timeout_string = ply_key_file_get_value (key_file, "Daemon", "DeviceTimeout");
-
-                if (timeout_string != NULL) {
-                        state->device_timeout = atof (timeout_string);
-                        ply_trace ("Device timeout is set to %lf", state->device_timeout);
-
-                        free (timeout_string);
-                }
+                state->device_timeout = ply_key_file_get_double(key_file, "Daemon", "DeviceTimeout", NAN);
+                ply_trace ("Device timeout is set to %lf", state->device_timeout);
         }
 
         scale_string = ply_key_file_get_value (key_file, "Daemon", "DeviceScale");
@@ -368,19 +377,9 @@ find_override_splash (state_t *state)
 
         if (splash_string != NULL) {
                 ply_trace ("Splash is configured to be '%s'", splash_string);
-                asprintf (&state->override_splash_path,
-                          PLYMOUTH_RUNTIME_THEME_PATH "%s/%s.plymouth",
-                          splash_string, splash_string);
 
-                ply_trace ("Checking if %s exists", state->override_splash_path);
-                if (!ply_file_exists (state->override_splash_path)) {
-                        ply_trace ("%s not found, fallbacking to " PLYMOUTH_THEME_PATH,
-                                   state->override_splash_path);
-                        free (state->override_splash_path);
-                        asprintf (&state->override_splash_path,
-                                  PLYMOUTH_THEME_PATH "%s/%s.plymouth",
-                                  splash_string, splash_string);
-                }
+                get_theme_path (splash_string, NULL, &state->override_splash_path);
+
                 free (splash_string);
         }
 
@@ -390,7 +389,7 @@ find_override_splash (state_t *state)
                 delay_string = ply_kernel_command_line_get_string_after_prefix ("plymouth.splash-delay=");
 
                 if (delay_string != NULL)
-                        state->splash_delay = atof (delay_string);
+                        state->splash_delay = ply_strtod (delay_string);
         }
 }
 
@@ -416,7 +415,8 @@ find_system_default_splash (state_t *state)
                 return;
         }
 
-        ply_trace ("System configured theme file is '%s'", state->system_default_splash_path);
+        if (state->system_default_splash_path != NULL)
+                ply_trace ("System configured theme file is '%s'", state->system_default_splash_path);
 }
 
 static void
@@ -433,7 +433,8 @@ find_distribution_default_splash (state_t *state)
                 }
         }
 
-        ply_trace ("Distribution default theme file is '%s'", state->distribution_default_splash_path);
+        if (state->distribution_default_splash_path != NULL)
+                ply_trace ("Distribution default theme file is '%s'", state->distribution_default_splash_path);
 }
 
 static void
@@ -588,7 +589,9 @@ on_hide_message (state_t    *state,
                 if (strcmp (list_message, message) == 0) {
                         free (list_message);
                         ply_list_remove_node (state->messages, node);
-                        ply_boot_splash_hide_message (state->boot_splash, message);
+                        if (state->boot_splash != NULL) {
+                            ply_boot_splash_hide_message (state->boot_splash, message);
+                        }
                 }
                 node = next_node;
         }
@@ -653,6 +656,12 @@ on_newroot (state_t    *state,
         }
 
         ply_trace ("new root mounted at \"%s\", switching to it", root_dir);
+
+        if (!strcmp (root_dir, "/run/initramfs") && debug_buffer != NULL) {
+                ply_trace ("switching back to initramfs, dumping debug-buffer now");
+                dump_debug_buffer_to_file ();
+        }
+
         chdir (root_dir);
         chroot (".");
         chdir ("/");
@@ -919,6 +928,7 @@ on_show_splash (state_t *state)
 
         if (plymouth_should_ignore_show_splash_calls (state)) {
                 ply_trace ("show splash called while ignoring show splash calls");
+                state->should_retain_splash = true;
                 dump_details_and_quit_splash (state);
                 return;
         }
@@ -1173,6 +1183,7 @@ on_hide_splash (state_t *state)
                 return;
 
         ply_trace ("hiding boot splash");
+        state->should_retain_splash = true;
         dump_details_and_quit_splash (state);
 }
 
@@ -1873,8 +1884,13 @@ check_verbosity (state_t *state)
         }
 
         if (debug_buffer != NULL) {
-                if (debug_buffer_path == NULL)
-                        debug_buffer_path = strdup (PLYMOUTH_LOG_DIRECTORY "/plymouth-debug.log");
+                if (debug_buffer_path == NULL) {
+                        if (state->mode == PLY_BOOT_SPLASH_MODE_SHUTDOWN ||
+                            state->mode == PLY_BOOT_SPLASH_MODE_REBOOT)
+                                debug_buffer_path = strdup (PLYMOUTH_LOG_DIRECTORY "/plymouth-shutdown-debug.log");
+                        else
+                                debug_buffer_path = strdup (PLYMOUTH_LOG_DIRECTORY "/plymouth-debug.log");
+                }
 
                 ply_logger_add_filter (ply_logger_get_error_default (),
                                        (ply_logger_filter_handler_t)
@@ -1974,7 +1990,7 @@ initialize_environment (state_t *state)
         state->entry_buffer = ply_buffer_new ();
         state->messages = ply_list_new ();
 
-        if (!ply_is_tracing ())
+        if (!ply_is_tracing_to_terminal ())
                 redirect_standard_io_to_dev_null ();
 
         ply_trace ("Making sure " PLYMOUTH_RUNTIME_DIR " exists");
@@ -2054,6 +2070,43 @@ on_crash (int signum)
 }
 
 static void
+start_plymouthd_fd_escrow (void)
+{
+        pid_t pid;
+
+        pid = fork ();
+        if (pid == 0) {
+                const char *argv[] = { PLYMOUTH_DRM_ESCROW_DIRECTORY "/plymouthd-fd-escrow", NULL };
+
+                execve (argv[0], (char * const *) argv, NULL);
+                ply_trace ("could not launch fd escrow process: %m");
+                _exit (1);
+        }
+}
+
+static void
+on_term_signal (state_t *state)
+{
+        bool retain_splash = false;
+
+        ply_trace ("received SIGTERM");
+
+        /*
+         * On shutdown/reboot with pixel-displays active, start the plymouthd-fd-escrow
+         * helper to hold on to the pixel-displays fds until the end.
+         */
+        if ((state->mode == PLY_BOOT_SPLASH_MODE_SHUTDOWN ||
+             state->mode == PLY_BOOT_SPLASH_MODE_REBOOT) &&
+            !state->is_inactive && state->boot_splash &&
+            ply_boot_splash_uses_pixel_displays (state->boot_splash)) {
+                start_plymouthd_fd_escrow ();
+                retain_splash = true;
+        }
+
+        on_quit (state, retain_splash, ply_trigger_new (NULL));
+}
+
+static void
 write_pid_file (const char *filename)
 {
         FILE *fp;
@@ -2077,6 +2130,7 @@ main (int    argc,
         bool no_boot_log = false;
         bool no_daemon = false;
         bool debug = false;
+        bool ignore_serial_consoles = false;
         bool attach_to_session;
         ply_daemon_handle_t *daemon_handle = NULL;
         char *mode_string = NULL;
@@ -2089,6 +2143,10 @@ main (int    argc,
 
         state.loop = ply_event_loop_get_default ();
 
+        /* Initialize the translations if they are available (!initrd) */
+        if (ply_directory_exists (PLYMOUTH_LOCALE_DIRECTORY))
+                setlocale(LC_ALL, "");
+
         ply_command_parser_add_options (state.command_parser,
                                         "help", "This help message", PLY_COMMAND_OPTION_TYPE_FLAG,
                                         "attach-to-session", "Redirect console messages from screen to log", PLY_COMMAND_OPTION_TYPE_FLAG,
@@ -2100,6 +2158,7 @@ main (int    argc,
                                         "kernel-command-line", "Fake kernel command line to use", PLY_COMMAND_OPTION_TYPE_STRING,
                                         "tty", "TTY to use instead of default", PLY_COMMAND_OPTION_TYPE_STRING,
                                         "no-boot-log", "Do not write boot log file", PLY_COMMAND_OPTION_TYPE_FLAG,
+                                        "ignore-serial-consoles", "Ignore serial consoles", PLY_COMMAND_OPTION_TYPE_FLAG,
                                         NULL);
 
         if (!ply_command_parser_parse_arguments (state.command_parser, state.loop, argv, argc)) {
@@ -2120,6 +2179,7 @@ main (int    argc,
                                         "no-boot-log", &no_boot_log,
                                         "no-daemon", &no_daemon,
                                         "debug", &debug,
+                                        "ignore-serial-consoles", &ignore_serial_consoles,
                                         "debug-file", &debug_buffer_path,
                                         "pid-file", &pid_file,
                                         "tty", &tty,
@@ -2208,11 +2268,18 @@ main (int    argc,
         }
 
         /* Make the first byte in argv be '@' so that we can survive systemd's killing
-         * spree when going from initrd to /, and so we stay alive all the way until
-         * the power is killed at shutdown.
+         * spree when going from initrd to /
          * http://www.freedesktop.org/wiki/Software/systemd/RootStorageDaemons
+         * Note ply_file_exists () does not work here because /etc/initrd-release
+         * is a symlink when using a dracut generated initrd.
          */
-        argv[0][0] = '@';
+        if (state.mode == PLY_BOOT_SPLASH_MODE_BOOT_UP &&
+            access ("/etc/initrd-release", F_OK) >= 0)
+                argv[0][0] = '@';
+
+        /* Catch SIGTERM for clean shutdown on poweroff/reboot */
+        ply_event_loop_watch_signal (state.loop, SIGTERM,
+                                     (ply_event_handler_t) on_term_signal, &state);
 
         state.boot_server = start_boot_server (&state);
 
@@ -2256,7 +2323,8 @@ main (int    argc,
         find_system_default_splash (&state);
         find_distribution_default_splash (&state);
 
-        if (ply_kernel_command_line_has_argument ("plymouth.ignore-serial-consoles"))
+        if (ply_kernel_command_line_has_argument ("plymouth.ignore-serial-consoles") ||
+            ignore_serial_consoles == true)
                 device_manager_flags |= PLY_DEVICE_MANAGER_FLAGS_IGNORE_SERIAL_CONSOLES;
 
         if (ply_kernel_command_line_has_argument ("plymouth.ignore-udev") ||
@@ -2303,6 +2371,10 @@ main (int    argc,
         }
 
         ply_free_error_log ();
+
+        free (state.override_splash_path);
+        free (state.system_default_splash_path);
+        free (state.distribution_default_splash_path);
 
         return exit_code;
 }

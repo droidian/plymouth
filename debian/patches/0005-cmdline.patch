@@ -50,8 +50,8 @@ Description:
  ConditionKernelCommandLine=!plymouth.enable=0
 +ConditionKernelCommandLine=!nosplash
  ConditionVirtualization=!container
+ IgnoreOnIsolate=true
  
- [Service]
 --- a/systemd-units/systemd-ask-password-plymouth.path.in
 +++ b/systemd-units/systemd-ask-password-plymouth.path.in
 @@ -6,6 +6,7 @@ Conflicts=shutdown.target

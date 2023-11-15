@@ -38,7 +38,7 @@ case "${THEME_NAME}" in
 		;;
 
 	*)
-		PLUGINS="text.so details.so label.so"
+		PLUGINS="text.so details.so"
 		;;
 esac
 

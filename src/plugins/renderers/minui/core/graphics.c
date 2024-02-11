@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 #include <linux/fb.h>
 #include <linux/kd.h>
@@ -92,7 +93,7 @@ text_blend(unsigned char *src_p, int src_row_bytes, unsigned char *dst_p,
 		for (i = 0; i < width; i++) {
 			unsigned char a = *sx++;
 
-			if (gr_current_a < 255)
+			if (gr_current_a < 255) {
 				a = ((int)a * gr_current_a) / 255;
 				if (a == 255) {
 					*px++ = gr_current_r;
@@ -116,6 +117,7 @@ text_blend(unsigned char *src_p, int src_row_bytes, unsigned char *dst_p,
 
 			src_p += src_row_bytes;
 			dst_p += dst_row_bytes;
+		}
 	}
 }
 
@@ -307,7 +309,11 @@ gr_blit(GRSurface *source, int sx, int sy, int w, int h, int dx, int dy)
 	dx += overscan_offset_x;
 	dy += overscan_offset_y;
 
-	if (outside(dx, dy) || outside(dx + w - 1, dy + h- 1))
+	if (dx < 0) sx -= dx, w += dx, dx = 0;
+	if (dy < 0) sy -= dy, h += dy, dy = 0;
+	if (dx + w > gr_draw->width) w = gr_draw->width - dx;
+	if (dy + h > gr_draw->height) h = gr_draw->height - dy;
+	if (w <= 0 || h <= 0)
 		return;
 
 	src_p = source->data + sy * source->row_bytes +
@@ -350,17 +356,29 @@ static void
 gr_init_font(void)
 {
 	int res;
+	static const char font_path[] = "/res/images/font.png";
 
 	/* TODO: Check for error */
 	gr_font = calloc(sizeof(*gr_font), 1);
 
-	if (!(res = res_create_alpha_surface("font", "/res/images", &(gr_font->texture)))) {
+	bool font_loaded = false;
+
+	if (access(font_path, F_OK) == -1 && errno == ENOENT) {
+		/* Not having a font file is normal, no need
+		 * to complain. */
+	}
+	else if (!(res = res_create_alpha_surface(font_path, NULL, &gr_font->texture))) {
 		/* The font image should be a 96x2 array of character images.
 		 * The columns are the printable ASCII characters 0x20 - 0x7f.
 		 * The top row is regular text; the bottom row is bold. */
 		gr_font->cwidth = gr_font->texture->width / 96;
 		gr_font->cheight = gr_font->texture->height / 2;
-	} else {
+	}
+	else {
+		printf("failed to read font: res=%d\n", res);
+	}
+
+	if (!font_loaded) {
 		unsigned char *bits, data, *in = font.rundata;
 
 		printf("failed to read font: res=%d\n", res);
@@ -424,6 +442,11 @@ gr_init(bool blank)
 */
 	gr_backend = open_fbdev();
 	gr_draw = gr_backend->init(gr_backend, blank);
+	if (gr_draw)
+		gr_flip();
+	if (gr_draw)
+		gr_flip();
+
 	if (!gr_draw) {
 		gr_backend->exit(gr_backend);
 
@@ -431,8 +454,22 @@ gr_init(bool blank)
 		gr_draw = gr_backend->init(gr_backend, blank);
 		gr_backend->exit(gr_backend);
 
-		gr_backend = open_drm();
-		gr_draw = gr_backend->init(gr_backend, blank);
+		//gr_backend = open_drm();
+		for (int failures = 0;;) {
+			gr_draw = gr_backend->init(gr_backend, blank);
+			if (gr_draw)
+				gr_flip();
+			if (gr_draw)
+				gr_flip();
+			if (gr_draw)
+				break;
+			gr_backend->exit(gr_backend);
+			if (++failures >= 5)
+				break;
+			struct timespec ts = { 0, 100 * 1000 * 1000 };
+			nanosleep(&ts, NULL);
+		}
+
 		if (!gr_draw)
 			return -1;
 	}
@@ -442,9 +479,6 @@ gr_init(bool blank)
 	overscan_offset_x = gr_draw->width  * overscan_percent / 100;
 	overscan_offset_y = gr_draw->height * overscan_percent / 100;
 
-	gr_flip();
-	gr_flip();
-
 	return 0;
 }
 
@@ -453,11 +487,16 @@ gr_init(bool blank)
 void
 gr_exit(void)
 {
-	gr_backend->exit(gr_backend);
+	if (gr_backend) {
+		gr_backend->exit(gr_backend);
+		gr_backend = NULL;
+	}
 
-	ioctl(gr_vt_fd, KDSETMODE, (void *)KD_TEXT);
-	close(gr_vt_fd);
-	gr_vt_fd = -1;
+	if (gr_vt_fd != -1) {
+		ioctl(gr_vt_fd, KDSETMODE, (void *)KD_TEXT);
+		close(gr_vt_fd);
+		gr_vt_fd = -1;
+	}
 }
 
 /* ------------------------------------------------------------------------ */

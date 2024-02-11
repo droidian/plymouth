@@ -69,6 +69,8 @@ static void drm_enable_crtc(int drm_fd, drmModeCrtc *crtc,
         printf("drmModeSetCrtc failed ret=%d\n", ret);
 }
 static void drm_blank(minui_backend* backend __unused, bool blank) {
+    (void)backend;
+
     if (blank)
         drm_disable_crtc(drm_fd, main_monitor_crtc);
     else
@@ -307,7 +309,10 @@ static void disable_non_main_crtcs(int fd,
         drmModeFreeCrtc(crtc);
     }
 }
-static GRSurface* drm_init(minui_backend* backend __unused) {
+static GRSurface* drm_init(minui_backend* backend __unused, bool blank) {
+    (void)backend;
+    (void)blank;
+
     drmModeRes *res = NULL;
     uint32_t selected_mode;
     char *dev_name;
@@ -384,6 +389,8 @@ static GRSurface* drm_init(minui_backend* backend __unused) {
     return &(drm_surfaces[0]->base);
 }
 static GRSurface* drm_flip(minui_backend* backend __unused) {
+    (void)backend;
+
     int ret;
     ret = drmModePageFlip(drm_fd, main_monitor_crtc->crtc_id,
                           drm_surfaces[current_buffer]->fb_id, 0, NULL);
@@ -395,6 +402,8 @@ static GRSurface* drm_flip(minui_backend* backend __unused) {
     return &(drm_surfaces[current_buffer]->base);
 }
 static void drm_exit(minui_backend* backend __unused) {
+    (void)backend;
+
     drm_disable_crtc(drm_fd, main_monitor_crtc);
     drm_destroy_surface(drm_surfaces[0]);
     drm_destroy_surface(drm_surfaces[1]);

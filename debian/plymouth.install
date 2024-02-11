@@ -1,6 +1,6 @@
 etc/logrotate.d
 etc/plymouth
-lib/systemd
+usr/lib/systemd
 usr/bin
 usr/lib/*/plymouth/details.so
 usr/lib/*/plymouth/renderers/drm.so
